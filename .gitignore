@@ -1,0 +1,7 @@
+# 忽略 PyCharm 项目配置
+.idea/
+
+# 其他常见忽略规则
+__pycache__/
+*.pyc
+.env
