@@ -5,10 +5,12 @@ from backend.app.routes.ingest import ingest_bp
 from backend.app.routes.login import auth_bp
 from backend.app.routes.retrieval import retrieval_bp
 from backend.app.routes.chat import rag_bp
+from flask_cors import CORS
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    CORS(app, resources={r"/*": {"origins": "*"}})
 
     # 初始化扩展
     db.init_app(app)

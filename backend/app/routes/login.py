@@ -58,9 +58,6 @@ def login():
     if not verify_password(password, user.password):
         return jsonify({"message": "密码不符"}), 401
 
-    if not user.is_active:
-        return jsonify({"error": "该账户已经被禁用"}), 403
-
     # 生成 JWT 令牌
     access_token = create_access_token({"sub": str(user.id),"role": user.role})
     loger_user_action(user_id=user.id,action="login in",role=user.role,target=request.method)
