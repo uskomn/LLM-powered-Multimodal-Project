@@ -12,18 +12,20 @@
 
 <script setup>
 import { ref } from "vue";
-import { register } from "../api/auth";
+import { register } from "../api/auth.js";
+import { useRouter } from "vue-router";
 
 const username = ref("");
 const password = ref("");
+const router = useRouter();
 
 const handleRegister = async () => {
   try {
-    const res = await register({ username: username.value, password: password.value });
+    await register(username.value, password.value);
     alert("注册成功，请登录！");
-    console.log(res.data);
+    router.push("/login");
   } catch (err) {
-    alert("注册失败: " + err.response?.data?.error || err.message);
+    alert("注册失败：" + (err.response?.data?.msg || err.message));
   }
 };
 </script>

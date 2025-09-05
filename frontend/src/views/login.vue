@@ -1,30 +1,32 @@
 <template>
   <div class="login">
     <h2>用户登录</h2>
-    <form @submit.prevent="handleLogin">
-      <input v-model="username" type="text" placeholder="用户名" required />
-      <input v-model="password" type="password" placeholder="密码" required />
-      <button type="submit">登录</button>
-    </form>
-    <p>还没有账号？<router-link to="/register">去注册</router-link></p>
+    <form @submit.prevent="handleLogin"></form>
+      <input v-model="username" type="text" placeholder="用户名" />
+      <input v-model="password" type="password" placeholder="密码" />
+      <button @click="handleLogin">登录</button>
+    <p>
+      没有账号？ <router-link to="/register">去注册</router-link>
+    </p>
   </div>
 </template>
 
 <script setup>
 import { ref } from "vue";
-import { login } from "../api/auth";
+import { login } from "../api/auth.js";
+import { useRouter } from "vue-router";
 
 const username = ref("");
 const password = ref("");
+const router = useRouter();
 
 const handleLogin = async () => {
   try {
-    const res = await login({ username: username.value, password: password.value });
-    alert("登录成功！");
-    console.log(res.data);
-    // 这里可以存 JWT 或跳转页面
+    const res = await login(username.value, password.value);
+    localStorage.setItem("token", res.data.token); // 保存 JWT
+    router.push("/"); // 跳转首页
   } catch (err) {
-    alert("登录失败: " + err.response?.data?.error || err.message);
+    alert("登录失败：" + (err.response?.data?.msg || err.message));
   }
 };
 </script>

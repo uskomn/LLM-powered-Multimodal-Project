@@ -1,30 +1,15 @@
 from flask import Blueprint, request, jsonify
-from backend.app.services.retrieval_service import vector_store
+from backend.app.services.ingest_service import load_faiss_index
 
-retrieval_bp = Blueprint("retrieval_bp", __name__)
+search_bp = Blueprint("search", __name__, url_prefix="/search")
 
-@retrieval_bp.route("/search", methods=["POST"])
-def search():
-    data = request.get_json()
-    query = data.get("query", "").strip()
-    if not query:
-        return jsonify({"error": "query is required"}), 400
+@search_bp.route("/query", methods=["POST"])
+def query():
+    query_text = request.json.get("query")
+    if not query_text:
+        return jsonify({"error": "缺少查询内容"}), 400
 
-    try:
-        raw_results = vector_store.search(query, top_k=5)
-
-        # 去重
-        seen_ids = set()
-        results = []
-        for doc in raw_results:
-            if doc["id"] in seen_ids:
-                continue
-            seen_ids.add(doc["id"])
-            results.append(doc)
-
-        return jsonify({"results": results}), 200
-    except Exception as e:
-        return jsonify({
-            "error": "搜索失败",
-            "details": str(e)
-        }), 500
+    store = load_faiss_index()
+    results = store.similarity_search(query_text, k=5)
+    output = [{"id": r.metadata["id"], "filename": r.metadata["filename"], "content": r.page_content} for r in results]
+    return jsonify(output)

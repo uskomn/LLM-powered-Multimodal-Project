@@ -10,7 +10,7 @@ import time
 
 SECRET_KEY = "aeijcmejsiefmeiaeigr"  # 替换为强随机密钥
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 # 过期时间
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440 # 过期时间
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

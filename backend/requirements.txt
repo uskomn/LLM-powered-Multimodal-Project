@@ -1,0 +1,14 @@
+flask==3.0.3
+flask-cors==4.0.1
+python-dotenv==1.0.1
+
+# LangChain 生态（按新拆分包）
+langchain==0.2.14
+langchain-community==0.2.12
+langchain-text-splitters==0.2.2
+langchain-openai==0.1.22
+
+faiss-cpu==1.8.0.post1
+sentence-transformers==3.0.1
+pypdf==4.2.0
+tiktoken==0.7.0
