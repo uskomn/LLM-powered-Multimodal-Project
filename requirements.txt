@@ -1,0 +1,55 @@
+# Web framework
+flask~=3.1.0
+flask-cors~=5.0.1
+flask-sqlalchemy==2.5.1
+
+# Database
+sqlalchemy==1.4.49
+pymysql==1.1.1
+
+# Machine Learning / NLP
+torch==2.0.1
+torchvision==0.15.2
+torchaudio==2.0.2
+transformers==4.33.3
+sentence-transformers~=3.0.1
+hanlp~=2.1.1
+protobuf==4.24.4
+
+# Vector Search
+faiss-cpu~=1.11.0
+
+# Utilities
+numpy==1.23.5
+scipy==1.10.1
+pandas==1.5.3
+scikit-learn==1.2.2
+
+# API & Async
+requests~=2.32.3
+httpx==0.24.1
+uvicorn==0.22.0
+fastapi==0.95.2
+
+# LangChain + LLM
+langchain~=0.3.25
+langchain-core==0.0.14
+huggingface-hub==0.17.3
+openai==0.27.8
+
+# Misc
+typing-extensions==4.7.1
+tqdm==4.66.1
+python-dotenv==1.0.0
+
+passlib~=1.7.4
+python-jose~=3.4.0
+flask-jwt-extended~=4.7.1
+pdfplumber~=0.11.7
+spacy~=3.8.5
+chardet~=5.2.0
+pypdf2~=3.0.1
+python-docx~=1.2.0
+py2neo~=2021.2.4
+jieba~=0.42.1
+pydantic~=2.11.4
