@@ -2,6 +2,8 @@ import os
 import re
 from backend.app.utils.extract_keywords import extract_keywords
 from backend.app.utils.kg import pdf_to_text_chunks,extract_triples
+from backend.app.utils.kn_merge import fuse_triples,knowledge_fusion
+from backend.app.utils.kn_merge_plus import fuse_triples_plus
 from flask import Blueprint, request, jsonify
 from py2neo import Graph, Node, Relationship
 
@@ -64,14 +66,16 @@ def upload_pdf_build_kg():
         all_triples = []
         for i, chunk in enumerate(chunks, 1):
             triples = extract_triples(chunk,DEEPSEEK_API_KEY, DEEPSEEK_API_URL)
-            save_triples_to_neo4j(triples,file.filename)
-            all_triples.extend(triples)
+            if triples:
+                all_triples.extend(triples)
+        final_triples=knowledge_fusion(all_triples)
+        save_triples_to_neo4j(final_triples,file.filename)
 
         return jsonify({
             "filename": file.filename,
             "total_chunks": len(chunks),
-            "triples_count": len(all_triples),
-            "triples": all_triples
+            "triples_count": len(final_triples),
+            "triples": final_triples
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

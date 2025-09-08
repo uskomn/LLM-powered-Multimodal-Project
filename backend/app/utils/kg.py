@@ -82,13 +82,8 @@ def extract_triples(text: str,DEEPSEEK_API_KEY:str,DEEPSEEK_API_URL:str):
         triples = json.loads(content)
     except Exception:
         triples = []
-    # print("大模型抽取执行完毕")
-    # print(triples)
-    #
     # # Fallback 或 融合 HanLP
     # rule_triples = hanlp_extract_triples(text)
-    # print("hanlp抽取执行完毕")
-    # print(rule_triples)
     # triples.extend(rule_triples)
     # print(triples)
     #

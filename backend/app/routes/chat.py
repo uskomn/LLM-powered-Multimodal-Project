@@ -67,7 +67,8 @@ def reason_pra_candidates(kg_results, top_k=5):
         try:
             pra_res = path_ranking(head, relation, tail, top_k)
             candidates.extend(pra_res)
-        except Exception:
+        except Exception as e:
+            print(str(e))
             continue
     return candidates
 
