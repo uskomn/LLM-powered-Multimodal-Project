@@ -4,6 +4,7 @@ from backend.app.utils.extract_keywords import extract_keywords
 from backend.app.utils.kg import pdf_to_text_chunks,extract_triples
 from backend.app.utils.kn_merge import fuse_triples,knowledge_fusion
 from backend.app.utils.kn_merge_plus import fuse_triples_plus
+from backend.app.utils.dynamic_split import dynamic_split
 from flask import Blueprint, request, jsonify
 from py2neo import Graph, Node, Relationship
 
@@ -62,6 +63,9 @@ def upload_pdf_build_kg():
     try:
         # 1. PDF → 分块文本
         chunks = pdf_to_text_chunks(file_path,chunk_size=128,overlap=10)
+        # chunks=dynamic_split(file_path,max_tokens=128,overlap=10)
+        print("分块完成")
+        print(f"{len(chunks)}文本块")
 
         all_triples = []
         for i, chunk in enumerate(chunks, 1):

@@ -46,3 +46,5 @@ typing_extensions==4.7.1
 
 # JSON & YAML
 PyYAML==6.0
+
+rank_bm25

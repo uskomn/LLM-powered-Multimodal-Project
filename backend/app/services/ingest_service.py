@@ -4,14 +4,18 @@ from langchain.vectorstores import FAISS
 from langchain.docstore import InMemoryDocstore
 from langchain.docstore.document import Document as LC_Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from backend.app.utils.dynamic_split import dynamic_split
 from backend.app.utils.embeddings import get_embedding
 from backend.app.models.document import Document
 from backend.app.extensions import db
+from transformers import AutoTokenizer
 import faiss
 
 FAISS_INDEX_PATH = "backend/faiss_index/faiss.index"
 FAISS_STORE_PATH = "backend/faiss_index/faiss_store.pkl"
 UPLOAD_STORE_PATH="backend/uploads"
+
+tokenizer = AutoTokenizer.from_pretrained("bert-base-chinese")
 
 def load_faiss_index():
     if os.path.exists(FAISS_INDEX_PATH) and os.path.exists(FAISS_STORE_PATH):
@@ -43,8 +47,10 @@ def ingest_document(file, content, user_id):
     filepath = os.path.join(UPLOAD_STORE_PATH, file.filename)
     file.save(filepath)
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    chunks = splitter.split_text(content)
+    # splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    # chunks = splitter.split_text(content)
+
+    chunks=dynamic_split(content,max_tokens=500,overlap=50)
 
     lc_docs = []
     ids = []
