@@ -10,12 +10,14 @@ from backend.app.models.user import User
 from backend.app.core.security import require_role
 from backend.app.utils.extract_keywords import extract_keywords
 from backend.app.utils.path_ranking import path_ranking
+from backend.app.services.retrieval_service import is_complex_query
 from py2neo import Graph
 from flask_jwt_extended import get_jwt_identity
 
 DEEPSEEK_API_KEY = "sk-8cbf10f456ae40aba1be330eaa3c2397"
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 QUERY_API_URL = "http://127.0.0.1:5000/retrieval/query"
+QUERY_ADVANCED_API_URL="http://127.0.0.1:5000/retrieval/query_advanced_sonquery"
 KG_API_URL="http://127.0.0.1:5000/kg/query"
 
 graph = Graph("bolt://localhost:7687", auth=("neo4j", "aqzdwsfneo"))
@@ -72,6 +74,23 @@ def reason_pra_candidates(kg_results, top_k=5):
             continue
     return candidates
 
+def call_deepseek_chat(query_text,context_texts):
+    messages = [
+        {"role": "system", "content": "你是知识问答助手，请结合已知文档回答问题。"},
+        {"role": "user", "content": f"问题: {query_text}\n知识库内容:\n{context_texts}"}
+    ]
+
+    # 调用 LLM
+    try:
+        headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
+        payload = {"model": "deepseek-chat", "messages": messages, "temperature": 0.7}
+        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        answer = response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        answer = f"LLM call failed: {str(e)}"
+    return answer
+
 
 @chat_bp.route("/chat", methods=["POST"])
 @require_role(['admin', 'user'], action_desc="大模型对话")
@@ -120,31 +139,22 @@ def chat():
             retrieved_context.extend(pra_results)
 
     if query_type in ["rag", "hybrid"]:
+        is_complex=is_complex_query(query_text)
         # RAG 检索
-        try:
-            search_resp = requests.post(QUERY_API_URL, json={"query": query_text})
-            search_resp.raise_for_status()
-            rag_results = search_resp.json()
-        except Exception as e:
-            rag_results = [{"content": f"error: {str(e)}"}]
-        retrieved_context.extend(rag_results)
+        if not is_complex:
+            try:
+                search_resp = requests.post(QUERY_API_URL, json={"query": query_text})
+                search_resp.raise_for_status()
+                rag_results = search_resp.json()
+
+            except Exception as e:
+                rag_results = [{"content": f"error: {str(e)}"}]
+            retrieved_context.extend(rag_results)
 
     # 构造 LLM prompt
     context_texts = "\n".join([str(r) for r in retrieved_context])
-    messages = [
-        {"role": "system", "content": "你是知识问答助手，请结合已知文档回答问题。"},
-        {"role": "user", "content": f"问题: {query_text}\n知识库内容:\n{context_texts}"}
-    ]
 
-    # 调用 LLM
-    try:
-        headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
-        payload = {"model": "deepseek-chat", "messages": messages, "temperature": 0.7}
-        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        answer = response.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        answer = f"LLM call failed: {str(e)}"
+    answer=call_deepseek_chat(query_text,context_texts)
 
     # 保存助手消息
     assistant_msg = Message(conversation_id=conversation_id, role="assistant", content=answer, created_at=datetime.utcnow())
