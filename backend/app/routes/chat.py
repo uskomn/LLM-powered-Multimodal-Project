@@ -18,30 +18,12 @@ DEEPSEEK_API_KEY = "sk-8cbf10f456ae40aba1be330eaa3c2397"
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 QUERY_API_URL = "http://127.0.0.1:5000/retrieval/query"
 QUERY_ADVANCED_API_URL="http://127.0.0.1:5000/retrieval/query_advanced_sonquery"
+PRA_API_URL="http://127.0.0.1:5000/PRA/reason_pra_test"
 KG_API_URL="http://127.0.0.1:5000/kg/query"
 
 graph = Graph("bolt://localhost:7687", auth=("neo4j", "aqzdwsfneo"))
 
 chat_bp = Blueprint("chat", __name__)
-
-def classify_query(query_text: str) -> str:
-    """调用 LLM 判断 query 类型"""
-    headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
-    prompt = f"""
-    你是一个智能助手，需要判断用户的问题属于哪种类型。
-    类型只有三类：
-    1. fact —— 精确事实问题，需要用知识图谱精确检索
-    2. rag —— 开放模糊问答，需要走语义检索
-    3. hybrid —— 复杂组合问题，需要同时结合知识图谱和语义检索
-    用户问题: {query_text}
-    请只返回一个单词: fact / rag / hybrid
-    """
-    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0}
-    response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload)
-    response.raise_for_status()
-    classification = response.json()["choices"][0]["message"]["content"].strip().lower()
-    return classification if classification in ["fact", "rag", "hybrid"] else "rag"
-
 
 def query_kg(keywords):
     """调用 search_kg 查询知识图谱"""
@@ -57,22 +39,6 @@ def query_kg(keywords):
         res = graph.run(cypher).data()
         results.extend(res)
     return results
-
-
-def reason_pra_candidates(kg_results, top_k=5):
-    """调用 PRA 做推理"""
-    candidates = []
-    for item in kg_results:
-        head = item.get("head")
-        relation = item.get("relation")
-        tail = item.get("tail", "")
-        try:
-            pra_res = path_ranking(head, relation, tail, top_k)
-            candidates.extend(pra_res)
-        except Exception as e:
-            print(str(e))
-            continue
-    return candidates
 
 def call_deepseek_chat(query_text,context_texts):
     messages = [
@@ -102,9 +68,12 @@ def chat():
 
     data = request.get_json()
     query_text = data.get("query", "").strip()
+    file_id=data.get("file_id")
     conversation_id = data.get("conversation_id")  # int类型，可选
     if not query_text:
         return jsonify({"error": "query is required"}), 400
+    if not file_id:
+        return jsonify({"error":"file_id is required"}),400
 
     # 创建或查询会话
     if not conversation_id:
@@ -125,45 +94,81 @@ def chat():
     db.session.add(user_msg)
     db.session.commit()
 
-    # 分类问题类型
-    query_type = classify_query(query_text)
+    is_complex=is_complex_query(query_text)
+    answer=""
+    answer_a,answer_b=None,None
+    if not is_complex:
+        hybrid_context = []
 
-    retrieved_context = []
+        # RAG 检索
+        try:
+            search_resp = requests.post(QUERY_API_URL, json={"query": query_text,"file_id":file_id})
+            search_resp.raise_for_status()
+            rag_results = search_resp.json()
+        except Exception as e:
+            rag_results = [{"content": f"error: {str(e)}"}]
+        hybrid_context.extend(rag_results)
 
-    if query_type in ["fact", "hybrid"]:
         keywords = extract_keywords(query_text)
         kg_results = query_kg(keywords)
-        retrieved_context.extend(kg_results)
-        if query_type == "hybrid":
-            pra_results = reason_pra_candidates(kg_results)
-            retrieved_context.extend(pra_results)
+        hybrid_context.extend(kg_results)
 
-    if query_type in ["rag", "hybrid"]:
-        is_complex=is_complex_query(query_text)
-        # RAG 检索
-        if not is_complex:
-            try:
-                search_resp = requests.post(QUERY_API_URL, json={"query": query_text})
-                search_resp.raise_for_status()
-                rag_results = search_resp.json()
+        try:
+            pra_resp = requests.post(PRA_API_URL,json={"query": query_text})
+            pra_resp.raise_for_status()
+            pra_results = pra_resp.json().get("candidates", [])
+        except Exception as e:
+            pra_results = [{"content": f"调用PRA接口失败: {str(e)}"}]
 
-            except Exception as e:
-                rag_results = [{"content": f"error: {str(e)}"}]
-            retrieved_context.extend(rag_results)
+        hybrid_context.extend(pra_results)
 
-    # 构造 LLM prompt
-    context_texts = "\n".join([str(r) for r in retrieved_context])
+        context_texts="\n".join([str(r) for r in hybrid_context])
 
-    answer=call_deepseek_chat(query_text,context_texts)
+        answer = call_deepseek_chat(query_text, context_texts)
 
-    # 保存助手消息
-    assistant_msg = Message(conversation_id=conversation_id, role="assistant", content=answer, created_at=datetime.utcnow())
-    db.session.add(assistant_msg)
-    db.session.commit()
+        # 保存助手消息
+        assistant_msg = Message(conversation_id=conversation_id, role="assistant", content=answer,
+                                created_at=datetime.utcnow())
+        db.session.add(assistant_msg)
+        db.session.commit()
+
+    else:
+        try:
+            hybrid_context = []
+
+            search_resp = requests.post(QUERY_API_URL, json={"query": query_text, "file_id": file_id})
+            search_resp.raise_for_status()
+            rag_results = search_resp.json()
+            hybrid_context.extend(rag_results)
+
+            keywords = extract_keywords(query_text)
+            kg_results = query_kg(keywords)
+            hybrid_context.extend(kg_results)
+
+            pra_resp = requests.post(PRA_API_URL,  json={"query": query_text})
+            pra_resp.raise_for_status()
+            pra_results = pra_resp.json().get("candidates", [])
+            hybrid_context.extend(pra_results)
+
+            context_texts_a = "\n".join([str(r) for r in hybrid_context])
+            answer_a = call_deepseek_chat(query_text, context_texts_a)
+
+        except Exception as e:
+            answer_a = f"方法A失败: {str(e)}"
+
+            # 方法 B: 子查询拆解
+        try:
+            result = requests.post(QUERY_ADVANCED_API_URL, json={"query": query_text, "file_id": file_id})
+            result.raise_for_status()
+            result = result.json()
+            answer_b = result.get("final_answer", "")
+        except Exception as e:
+            answer_b = f"方法B失败: {str(e)}"
 
     return jsonify({
         "conversation_id": conversation_id,
-        "query_type": query_type,
-        "answer": answer,
-        "retrieved_context": retrieved_context
+        "query_type": "complex" if is_complex else "simple",
+        "answer": answer if not is_complex else None,
+        "answer_a": answer_a if is_complex else None,
+        "answer_b": answer_b if is_complex else None
     })

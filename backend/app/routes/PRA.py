@@ -105,7 +105,6 @@ def reason_pra_test():
             # 不传 relation，允许任意路径；查找 head -> tail（1..3跳）
             try:
                 results = path_ranking(head, relation="", tail=tail, top_k=5)
-                print(results)
                 # 只收集真正的推理（inferred_relation 非空）
                 for r in results:
                     if r.get("inferred_relation"):

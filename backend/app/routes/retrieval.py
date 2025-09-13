@@ -68,11 +68,14 @@ def query_advanced():
     改进版 RAG 检索接口：带 BM25 + 向量融合排序 & 上下文融合
     """
     query_text = request.json.get("query")
+    file_id=request.json.get("file_id")
     query_text=query_rewrite(query_text)
     if not query_text:
         return jsonify({"error": "缺少查询内容"}), 400
+    if not file_id:
+        return jsonify({"error":"缺少文件id"}),400
 
-    store = load_faiss_index()
+    store = load_faiss_index(file_id)
     results = store.similarity_search(query_text, k=10)  # 先取更多候选
 
     # 融合排序 + 上下文融合
@@ -91,10 +94,11 @@ def query_advanced():
 @search_bp.route("/query", methods=["POST"])
 def query():
     query_text = request.json.get("query")
+    file_id=request.json.get("file_id")
     if not query_text:
         return jsonify({"error": "缺少查询内容"}), 400
 
-    store = load_faiss_index()
+    store = load_faiss_index(file_id)
     results = store.similarity_search(query_text, k=5)
     output = [{"id": r.metadata["id"], "filename": r.metadata["filename"], "content": r.page_content} for r in results]
     return jsonify(output)
@@ -107,15 +111,18 @@ def query_advanced_sonquery():
     - 复杂问题：子问题分解 → 多轮检索 → 合成最终答案
     """
     query_text = request.json.get("query")
+    file_id=request.json.get("file_id")
     if not query_text:
         return jsonify({"error": "缺少查询内容"}), 400
+    if not file_id:
+        return jsonify({"error":"缺少文件id"}),400
 
     # 先做 query 改写
     query_text = query_rewrite(query_text)
 
     # === Step 3. 复杂问题 → 子问题分解 ===
     sub_queries = decompose_query(query_text)
-    store = load_faiss_index()
+    store = load_faiss_index(file_id)
     answers = []
     context_history = ""
 

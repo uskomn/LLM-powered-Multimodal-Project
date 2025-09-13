@@ -69,6 +69,7 @@ def upload_pdf_build_kg():
 
         all_triples = []
         for i, chunk in enumerate(chunks, 1):
+            print(f"{i}")
             triples = extract_triples(chunk,DEEPSEEK_API_KEY, DEEPSEEK_API_URL)
             if triples:
                 all_triples.extend(triples)
